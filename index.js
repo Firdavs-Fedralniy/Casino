@@ -1,5 +1,12 @@
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
+
+import fs from "fs";
+
+console.log("cwd:", process.cwd());
+console.log(".env exists:", fs.existsSync(".env"));
+
+
 dotenv.config();
 
 const TOKEN = process.env.BOT_TOKEN;
