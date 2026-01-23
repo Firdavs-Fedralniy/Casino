@@ -1,7 +1,16 @@
 import TelegramBot from "node-telegram-bot-api";
+import dotenv from "dotenv";
+dotenv.config();
 
 const TOKEN = process.env.BOT_TOKEN;
+
+if (!TOKEN) {
+  console.error("❌ BOT_TOKEN не найден! Проверь .env или Shared Variables");
+  process.exit(1);
+}
+
 const bot = new TelegramBot(TOKEN, { polling: true });
+
 
 let botEnabled = false;
 const mode = new Map();
