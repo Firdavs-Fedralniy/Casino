@@ -5,6 +5,9 @@ import fs from "fs";
 
 console.log("cwd:", process.cwd());
 console.log(".env exists:", fs.existsSync(".env"));
+console.log("ENV:", process.env.NODE_ENV);
+console.log("BOT_TOKEN:", process.env.BOT_TOKEN ? "OK" : "NOT FOUND");
+
 
 
 dotenv.config();
