@@ -8,6 +8,8 @@ if (!TOKEN) {
   console.error("❌ BOT_TOKEN не найден! Проверь .env или Shared Variables");
   process.exit(1);
 }
+console.log("BOT_TOKEN length:", TOKEN ? TOKEN.length : "undefined");
+
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 
