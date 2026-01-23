@@ -1,22 +1,31 @@
 import TelegramBot from "node-telegram-bot-api";
 import dotenv from "dotenv";
+import express from "express";
 
 dotenv.config();
 
-console.log("ENV:", process.env.NODE_ENV);
-console.log("BOT_TOKEN:", process.env.BOT_TOKEN ? "OK" : "NOT FOUND");
-
 const TOKEN = process.env.BOT_TOKEN;
-
-
 if (!TOKEN) {
   console.error("❌ BOT_TOKEN не найден! Проверь .env или Shared Variables");
   process.exit(1);
 }
-console.log("BOT_TOKEN length:", TOKEN ? TOKEN.length : "undefined");
 
+const app = express();
+app.use(express.json());
 
-const bot = new TelegramBot(TOKEN, { polling: true });
+const PORT = process.env.PORT || 3000;
+const WEBHOOK_URL = process.env.WEBHOOK_URL; // добавь в Railway
+
+const bot = new TelegramBot(TOKEN);
+
+// Устанавливаем webhook
+bot.setWebHook(`${WEBHOOK_URL}/bot${TOKEN}`);
+
+// Telegram будет слать обновления сюда
+app.post(`/bot${TOKEN}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
 
 
 let botEnabled = false;
@@ -51,7 +60,6 @@ bot.onText(/\/start/, async (msg) => {
     return bot.sendMessage(msg.chat.id, "Привет! Я буду отправлять тебе уведомления из группы.");
   }
 
-  // Группа
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
@@ -152,4 +160,6 @@ bot.on("dice", async (msg) => {
   }
 });
 
-console.log("🤖 Бот запущен");
+app.listen(PORT, () => {
+  console.log("Server started on port", PORT);
+});
