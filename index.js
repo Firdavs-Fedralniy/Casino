@@ -1,11 +1,11 @@
 import TelegramBot from "node-telegram-bot-api";
 
-const TOKEN = "7525040544:AAGL6XoJndHkwKWBY_7UoaXgduHJLP6lofs";
+const TOKEN = process.env.BOT_TOKEN;
 const bot = new TelegramBot(TOKEN, { polling: true });
 
 let botEnabled = false;
-const mode = new Map(); // chatId -> "cube" | "slot"
-const allowedAdmins = new Set(); // userId who wrote /start in private
+const mode = new Map();
+const allowedAdmins = new Set();
 
 // ---------- utils ----------
 async function getAdmins(chatId) {
@@ -28,18 +28,14 @@ function getMessageLink(chat, messageId) {
   return `tg://openmessage?chat_id=${chat.id}&message_id=${messageId}`;
 }
 
-// ---------- /start (ЛС) ----------
-bot.onText(/\/start/, (msg) => {
+// ---------- /start ----------
+bot.onText(/\/start/, async (msg) => {
   if (msg.chat.type === "private") {
     allowedAdmins.add(msg.from.id);
     return bot.sendMessage(msg.chat.id, "Привет! Я буду отправлять тебе уведомления из группы.");
   }
-});
 
-// ---------- /start (Группа включение) ----------
-bot.onText(/\/start/, async (msg) => {
-  if (msg.chat.type === "private") return;
-
+  // Группа
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
@@ -107,7 +103,7 @@ bot.on("dice", async (msg) => {
   const groupLink = getGroupLink(msg.chat);
   const messageLink = getMessageLink(msg.chat, msg.message_id);
 
-  // ---------- SLOT ----------
+  // SLOT
   if (currentMode === "slot" && msg.dice.emoji === "🎰") {
     if (value === 64) {
       const admins = await getAdmins(chatId);
@@ -123,7 +119,7 @@ bot.on("dice", async (msg) => {
     }
   }
 
-  // ---------- CUBE ----------
+  // CUBE
   if (currentMode === "cube" && msg.dice.emoji === "🎲") {
     if (value === 6) {
       const admins = await getAdmins(chatId);
