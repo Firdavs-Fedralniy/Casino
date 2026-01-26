@@ -1,28 +1,53 @@
-import express from "express";
 import TelegramBot from "node-telegram-bot-api";
+import fs from "fs";
+import http from "http";
 
-// --- CONFIG ---
+// ------------------
+// constants
+// ------------------
 const TOKEN = process.env.BOT_TOKEN;
-const WEBHOOK_URL = process.env.WEBHOOK_URL; // https://your-replit-domain.repl.co
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
+const ADMINS_FILE = "./admins.json";
 
 if (!TOKEN) {
   console.error("❌ BOT_TOKEN не найден!");
   process.exit(1);
 }
 
-if (!WEBHOOK_URL) {
-  console.error("❌ WEBHOOK_URL не найден!");
-  process.exit(1);
+// ------------------
+// load admins
+// ------------------
+let allowedAdmins = new Set();
+
+function loadAdmins() {
+  try {
+    const data = fs.readFileSync(ADMINS_FILE, "utf8");
+    const arr = JSON.parse(data);
+    allowedAdmins = new Set(arr);
+    console.log("✅ Admins loaded:", arr);
+  } catch (e) {
+    allowedAdmins = new Set();
+    console.log("⚠️ No admins file found, starting empty");
+  }
 }
 
-const bot = new TelegramBot(TOKEN);
+function saveAdmins() {
+  fs.writeFileSync(ADMINS_FILE, JSON.stringify([...allowedAdmins]));
+}
 
-// ---------- bot logic ----------
+loadAdmins();
+
+// ------------------
+// bot init
+// ------------------
+const bot = new TelegramBot(TOKEN, { polling: true });
+
 let botEnabled = false;
 const mode = new Map();
-const allowedAdmins = new Set();
 
+// ------------------
+// utils
+// ------------------
 async function getAdmins(chatId) {
   return await bot.getChatAdministrators(chatId);
 }
@@ -43,26 +68,38 @@ function getMessageLink(chat, messageId) {
   return `tg://openmessage?chat_id=${chat.id}&message_id=${messageId}`;
 }
 
-// ---------- /start ----------
+// ------------------
+// /start
+// ------------------
 bot.onText(/\/start/, async (msg) => {
   if (msg.chat.type === "private") {
     allowedAdmins.add(msg.from.id);
-    return bot.sendMessage(msg.chat.id, "Привет! Я буду отправлять тебе уведомления из группы.");
+    saveAdmins();
+
+    return bot.sendMessage(
+      msg.chat.id,
+      "Привет! Ты добавлен в список админов. Теперь я буду присылать уведомления."
+    );
   }
 
+  // group
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
   const admins = await getAdmins(chatId);
   if (!isAdmin(admins, userId)) return;
 
-  allowedAdmins.add(userId);
-
   botEnabled = true;
-  bot.sendMessage(chatId, "✅ Бот включён. Админ может выбрать режим:\n/cube\n/slot");
+  mode.set(chatId, "slot"); // default mode
+  allowedAdmins.add(userId);
+  saveAdmins();
+
+  bot.sendMessage(chatId, "✅ Бот включён. Админ добавлен. Режим: slot");
 });
 
-// ---------- /off ----------
+// ------------------
+// /off
+// ------------------
 bot.onText(/\/off/, async (msg) => {
   if (msg.chat.type === "private") return;
 
@@ -76,7 +113,9 @@ bot.onText(/\/off/, async (msg) => {
   bot.sendMessage(chatId, "🛑 Бот выключен");
 });
 
-// ---------- /cube ----------
+// ------------------
+// modes
+// ------------------
 bot.onText(/\/cube/, async (msg) => {
   if (!botEnabled || msg.chat.type === "private") return;
 
@@ -90,7 +129,6 @@ bot.onText(/\/cube/, async (msg) => {
   bot.sendMessage(chatId, "🎲 Режим КУБИКА включён");
 });
 
-// ---------- /slot ----------
 bot.onText(/\/slot/, async (msg) => {
   if (!botEnabled || msg.chat.type === "private") return;
 
@@ -104,7 +142,9 @@ bot.onText(/\/slot/, async (msg) => {
   bot.sendMessage(chatId, "🎰 Режим СЛОТА включён");
 });
 
-// ---------- dice ----------
+// ------------------
+// dice
+// ------------------
 bot.on("dice", async (msg) => {
   if (!botEnabled) return;
 
@@ -123,14 +163,10 @@ bot.on("dice", async (msg) => {
   // SLOT
   if (currentMode === "slot" && msg.dice.emoji === "🎰") {
     if (value === 64) {
-      const admins = await getAdmins(chatId);
-
-      for (const admin of admins) {
-        if (!allowedAdmins.has(admin.user.id)) continue;
-
+      for (const adminId of allowedAdmins) {
         bot.sendMessage(
-          admin.user.id,
-          `🚨 В группе "${msg.chat.title}"\n🎰 Игрок ${user.first_name} выбил 777\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группу: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
+          adminId,
+          `🚨 В группе "${msg.chat.title}"\n🎰 Игрок ${user.first_name} выбил 777\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группе: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
         ).catch(() => {});
       }
     }
@@ -139,38 +175,26 @@ bot.on("dice", async (msg) => {
   // CUBE
   if (currentMode === "cube" && msg.dice.emoji === "🎲") {
     if (value === 6) {
-      const admins = await getAdmins(chatId);
-
-      for (const admin of admins) {
-        if (!allowedAdmins.has(admin.user.id)) continue;
-
+      for (const adminId of allowedAdmins) {
         bot.sendMessage(
-          admin.user.id,
-          `🚨 В группе "${msg.chat.title}"\n🎲 Игрок ${user.first_name} выбил 6\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группу: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
+          adminId,
+          `🚨 В группе "${msg.chat.title}"\n🎲 Игрок ${user.first_name} выбил 6\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группе: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
         ).catch(() => {});
       }
     }
   }
 });
 
-console.log("🤖 Бот запущен на webhook");
+console.log("🤖 Бот запущен");
 
-// --- WEBHOOK SETUP ---
-bot.setWebHook(`${WEBHOOK_URL}/bot${TOKEN}`);
-
-// --- EXPRESS SERVER ---
-const app = express();
-app.use(express.json());
-
-app.post(`/bot${TOKEN}`, (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
-
-app.get("/", (req, res) => {
-  res.send("ok");
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// ------------------
+// keep server awake (optional)
+// ------------------
+http
+  .createServer((req, res) => {
+    res.end("ok");
+  })
+  .listen(PORT, () => {
+    console.log("Server running on port", PORT);
+  });
+ 
