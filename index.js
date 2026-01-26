@@ -1,38 +1,28 @@
-import TelegramBot from "node-telegram-bot-api";
-import dotenv from "dotenv";
 import express from "express";
+import TelegramBot from "node-telegram-bot-api";
 
-dotenv.config();
-
+// --- CONFIG ---
 const TOKEN = process.env.BOT_TOKEN;
+const WEBHOOK_URL = process.env.WEBHOOK_URL; // https://your-replit-domain.repl.co
+const PORT = process.env.PORT || 5000;
+
 if (!TOKEN) {
-  console.error("❌ BOT_TOKEN не найден! Проверь .env или Shared Variables");
+  console.error("❌ BOT_TOKEN не найден!");
   process.exit(1);
 }
 
-const app = express();
-app.use(express.json());
-
-const PORT = process.env.PORT || 3000;
-const WEBHOOK_URL = process.env.WEBHOOK_URL; // добавь в Railway
+if (!WEBHOOK_URL) {
+  console.error("❌ WEBHOOK_URL не найден!");
+  process.exit(1);
+}
 
 const bot = new TelegramBot(TOKEN);
 
-// Устанавливаем webhook
-bot.setWebHook(`${WEBHOOK_URL}/bot${TOKEN}`);
-
-// Telegram будет слать обновления сюда
-app.post(`/bot${TOKEN}`, (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
-
-
+// ---------- bot logic ----------
 let botEnabled = false;
 const mode = new Map();
 const allowedAdmins = new Set();
 
-// ---------- utils ----------
 async function getAdmins(chatId) {
   return await bot.getChatAdministrators(chatId);
 }
@@ -66,6 +56,8 @@ bot.onText(/\/start/, async (msg) => {
   const admins = await getAdmins(chatId);
   if (!isAdmin(admins, userId)) return;
 
+  allowedAdmins.add(userId);
+
   botEnabled = true;
   bot.sendMessage(chatId, "✅ Бот включён. Админ может выбрать режим:\n/cube\n/slot");
 });
@@ -84,7 +76,7 @@ bot.onText(/\/off/, async (msg) => {
   bot.sendMessage(chatId, "🛑 Бот выключен");
 });
 
-// ---------- режимы ----------
+// ---------- /cube ----------
 bot.onText(/\/cube/, async (msg) => {
   if (!botEnabled || msg.chat.type === "private") return;
 
@@ -98,6 +90,7 @@ bot.onText(/\/cube/, async (msg) => {
   bot.sendMessage(chatId, "🎲 Режим КУБИКА включён");
 });
 
+// ---------- /slot ----------
 bot.onText(/\/slot/, async (msg) => {
   if (!botEnabled || msg.chat.type === "private") return;
 
@@ -160,6 +153,24 @@ bot.on("dice", async (msg) => {
   }
 });
 
+console.log("🤖 Бот запущен на webhook");
+
+// --- WEBHOOK SETUP ---
+bot.setWebHook(`${WEBHOOK_URL}/bot${TOKEN}`);
+
+// --- EXPRESS SERVER ---
+const app = express();
+app.use(express.json());
+
+app.post(`/bot${TOKEN}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+
+app.get("/", (req, res) => {
+  res.send("ok");
+});
+
 app.listen(PORT, () => {
-  console.log("Server started on port", PORT);
+  console.log(`Server running on port ${PORT}`);
 });
