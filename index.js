@@ -160,17 +160,28 @@ bot.on("dice", async (msg) => {
   const groupLink = getGroupLink(msg.chat);
   const messageLink = getMessageLink(msg.chat, msg.message_id);
 
-  // SLOT
   if (currentMode === "slot" && msg.dice.emoji === "🎰") {
-    if (value === 64) {
-      for (const adminId of allowedAdmins) {
-        bot.sendMessage(
-          adminId,
-          `🚨 В группе "${msg.chat.title}"\n🎰 Игрок ${user.first_name} выбил 777\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группе: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
-        ).catch(() => {});
-      }
+  if (value === 64) {
+
+    // 🎁 ВЫДАЧА ПОДАРКА (777)
+    fetch("http://localhost:8000/win777", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: user.id
+      })
+    }).catch(() => {});
+
+    // 🚨 УВЕДОМЛЕНИЕ АДМИНАМ
+    for (const adminId of allowedAdmins) {
+      bot.sendMessage(
+        adminId,
+        `🚨 В группе "${msg.chat.title}"\n🎰 Игрок ${user.first_name} выбил 777\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группе: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
+      ).catch(() => {});
     }
   }
+}
+
 
   // CUBE
   if (currentMode === "cube" && msg.dice.emoji === "🎲") {
