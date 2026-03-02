@@ -233,8 +233,15 @@ bot.on("dice", async (msg) => {
   if (currentMode === "bowling" && msg.dice.emoji === "🎳" && value === 6)
     notify(`🎳 Игрок ${user.first_name} сбил все кегли`);
 
-  if (currentMode === "football" && (msg.dice.emoji === "⚽" || msg.dice.emoji === "⚽️") && value >= 4)
-    notify(`⚽️ Игрок ${user.first_name} забил гол`);
+  if (currentMode === "football" && (msg.dice.emoji === "⚽" || msg.dice.emoji === "⚽️")) 
+     if (value >= 4) { // гол на 4 или 5
+        for (const adminId of allowedAdmins) {
+            bot.sendMessage(
+                adminId,
+                `🚨 В группе "${msg.chat.title}"\n⚽️ Игрок ${user.first_name} забил гол!\n`
+            );
+        }
+    }
 });
 
 console.log("🤖 Бот запущен");
