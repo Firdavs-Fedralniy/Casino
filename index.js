@@ -158,6 +158,47 @@ bot.onText(/\/basket/, async (msg) => {
   bot.sendMessage(chatId, "🏀 Режим Баскетбола включён");
 });
 
+//darts
+bot.onText(/\/darts/, async (msg) => {
+  if (!botEnabled || msg.chat.type === "private") return;
+
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  const admins = await getAdmins(chatId);
+  if (!isAdmin(admins, userId)) return;
+
+  mode.set(chatId, "darts");
+  bot.sendMessage(chatId, "🎯 Режим Дартса включён");
+});
+
+//bowling
+bot.onText(/\/bowling/, async (msg) => {
+  if (!botEnabled || msg.chat.type === "private") return;
+
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  const admins = await getAdmins(chatId);
+  if (!isAdmin(admins, userId)) return;
+
+  mode.set(chatId, "bowling");
+  bot.sendMessage(chatId, "🎳 Режим Бовлинга включён");
+});
+
+//football
+bot.onText(/\/football/, async (msg) => {
+  if (!botEnabled || msg.chat.type === "private") return;
+
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  const admins = await getAdmins(chatId);
+  if (!isAdmin(admins, userId)) return;
+
+  mode.set(chatId, "football");
+  bot.sendMessage(chatId, "⚽️ Режим Футбол включён");
+});
 
 // ------------------
 // dice
@@ -206,8 +247,48 @@ bot.on("dice", async (msg) => {
   }
   //Basketball
    if (currentMode === "basket" && msg.dice.emoji === "🏀") {
-    print(value)
+     if (value === 5) {
+      for (const adminId of allowedAdmins) {
+        bot.sendMessage(
+          adminId,
+          `🚨 В группе "${msg.chat.title}"\n🏀 Игрок ${user.first_name} попал точно в колльцо\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группе: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
+        ).catch(() => {});
+      }
+    }
   }
+  //Darts
+   if (currentMode === "darts" && msg.dice.emoji === "🎯") {
+     if (value === 6) {
+      for (const adminId of allowedAdmins) {
+        bot.sendMessage(
+          adminId,
+          `🚨 В группе "${msg.chat.title}"\n🎯 Игрок ${user.first_name} попал В Яблочко\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группе: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
+        ).catch(() => {});
+      }
+    }
+  }
+  //Bowling
+  if (currentMode === "bowling" && msg.dice.emoji === "🎳") {
+     if (value === 6) {
+      for (const adminId of allowedAdmins) {
+        bot.sendMessage(
+          adminId,
+          `🚨 В группе "${msg.chat.title}"\n🎳 Игрок ${user.first_name} сбил все кегли\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группе: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
+        ).catch(() => {});
+      }
+    }
+  }
+   if (currentMode === "football" && msg.dice.emoji === "⚽️") {
+     if (value === 5) {
+      for (const adminId of allowedAdmins) {
+        bot.sendMessage(
+          adminId,
+          `🚨 В группе "${msg.chat.title}"\n⚽️ Игрок ${user.first_name} Забил гол\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группе: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
+        ).catch(() => {});
+      }
+    }
+  }
+
 });
 
 console.log("🤖 Бот запущен");
