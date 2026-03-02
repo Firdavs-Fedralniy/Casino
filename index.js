@@ -233,7 +233,7 @@ bot.on("dice", async (msg) => {
   if (currentMode === "bowling" && msg.dice.emoji === "🎳" && value === 6)
     notify(`🎳 Игрок ${user.first_name} сбил все кегли`);
 
-  if (currentMode === "football" && (msg.dice.emoji === "⚽" || msg.dice.emoji === "⚽️") && value >= 3)
+  if (currentMode === "football" && (msg.dice.emoji === "⚽" || msg.dice.emoji === "⚽️") && value >= 4)
     notify(`⚽️ Игрок ${user.first_name} забил гол`);
 });
 
