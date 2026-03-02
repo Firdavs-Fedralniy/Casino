@@ -278,16 +278,16 @@ bot.on("dice", async (msg) => {
       }
     }
   }
-   if (currentMode === "football" && msg.dice.emoji === "⚽️") {
-     if (value === 5) {
-      for (const adminId of allowedAdmins) {
-        bot.sendMessage(
-          adminId,
-          `🚨 В группе "${msg.chat.title}"\n⚽️ Игрок ${user.first_name} Забил гол\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группе: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
-        ).catch(() => {});
-      }
+  if (currentMode === "football" && (msg.dice.emoji === "⚽" || msg.dice.emoji === "⚽️")) {
+    if (value === 5) {
+        for (const adminId of allowedAdmins) {
+            bot.sendMessage(
+                adminId,
+                `🚨 В группе "${msg.chat.title}"\n⚽️ Игрок ${user.first_name} забил гол\n\n🔗 Ссылка на игрока: ${userLink}\n🔗 Ссылка на группе: ${groupLink}\n🔗 Ссылка на сообщение: ${messageLink}`
+            ).catch(() => {});
+        }
     }
-  }
+}
 
 });
 
