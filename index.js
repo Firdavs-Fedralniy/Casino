@@ -1,5 +1,6 @@
 import TelegramBot from "node-telegram-bot-api";
 import fs from "fs";
+import 'dotenv/config'; // автоматически подгружает .env
 import http from "http";
 
 // ------------------
@@ -9,6 +10,7 @@ const TOKEN = process.env.BOT_TOKEN;
 const PORT = process.env.PORT || 3000;
 const ADMINS_FILE = "./admins.json";
 
+console.log("BOT_TOKEN =", process.env.BOT_TOKEN);
 if (!TOKEN) {
   console.error("❌ BOT_TOKEN не найден!");
   process.exit(1);
@@ -116,6 +118,7 @@ bot.onText(/\/off/, async (msg) => {
 // ------------------
 // modes
 // ------------------
+//cube
 bot.onText(/\/cube/, async (msg) => {
   if (!botEnabled || msg.chat.type === "private") return;
 
@@ -128,7 +131,7 @@ bot.onText(/\/cube/, async (msg) => {
   mode.set(chatId, "cube");
   bot.sendMessage(chatId, "🎲 Режим КУБИКА включён");
 });
-
+//slot
 bot.onText(/\/slot/, async (msg) => {
   if (!botEnabled || msg.chat.type === "private") return;
 
@@ -141,6 +144,20 @@ bot.onText(/\/slot/, async (msg) => {
   mode.set(chatId, "slot");
   bot.sendMessage(chatId, "🎰 Режим СЛОТА включён");
 });
+//basket
+bot.onText(/\/basket/, async (msg) => {
+  if (!botEnabled || msg.chat.type === "private") return;
+
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  const admins = await getAdmins(chatId);
+  if (!isAdmin(admins, userId)) return;
+
+  mode.set(chatId, "basket");
+  bot.sendMessage(chatId, "🏀 Режим Баскетбола включён");
+});
+
 
 // ------------------
 // dice
@@ -163,14 +180,7 @@ bot.on("dice", async (msg) => {
   if (currentMode === "slot" && msg.dice.emoji === "🎰") {
   if (value === 64) {
 
-    // 🎁 ВЫДАЧА ПОДАРКА (777)
-    fetch("http://localhost:8000/win777", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: user.id
-      })
-    }).catch(() => {});
+ 
 
     // 🚨 УВЕДОМЛЕНИЕ АДМИНАМ
     for (const adminId of allowedAdmins) {
@@ -193,6 +203,10 @@ bot.on("dice", async (msg) => {
         ).catch(() => {});
       }
     }
+  }
+  //Basketball
+   if (currentMode === "basket" && msg.dice.emoji === "🏀") {
+    print(value)
   }
 });
 
