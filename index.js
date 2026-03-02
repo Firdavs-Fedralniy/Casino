@@ -234,7 +234,7 @@ bot.on("dice", async (msg) => {
     notify(`🎳 Игрок ${user.first_name} сбил все кегли`);
 
   if (currentMode === "football" && (msg.dice.emoji === "⚽" || msg.dice.emoji === "⚽️")) 
-     if (value >= 4) { // гол на 4 или 5
+     if (value >= 5) { // гол на 4 или 5
         for (const adminId of allowedAdmins) {
             bot.sendMessage(
                 adminId,
