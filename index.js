@@ -279,7 +279,7 @@ bot.on("dice", async (msg) => {
     }
   }
   if (currentMode === "football" && (msg.dice.emoji === "⚽" || msg.dice.emoji === "⚽️")) {
-    if (value === 5) {
+    if (value >= 3) {
         for (const adminId of allowedAdmins) {
             bot.sendMessage(
                 adminId,
