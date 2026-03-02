@@ -238,7 +238,7 @@ bot.on("dice", async (msg) => {
         for (const adminId of allowedAdmins) {
             bot.sendMessage(
                 adminId,
-                `🚨 В группе "${msg.chat.title}"\n⚽️ Игрок ${user.first_name} забил гол!\n`
+                `🚨 В группе "${msg.chat.title}"\n⚽️ Игрок ${user.first_name} забил гол!\n ${value}`
             );
         }
     }
