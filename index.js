@@ -6,7 +6,7 @@ import http from "http";
 const TOKEN = process.env.BOT_TOKEN;
 const PORT = process.env.PORT || 3000;
 const ADMINS_FILE = "./admins.json";
-const ADMIN_CODE = "998996560701"; // ← сюда вставь свой код
+const ADMIN_CODE = "998996560701";
 
 if (!TOKEN) {
   console.error("❌ BOT_TOKEN не найден!");
@@ -42,7 +42,7 @@ const bot = new TelegramBot(TOKEN, { polling: true });
 
 let botEnabled = false;
 const mode = new Map();
-const waitingForCode = new Set(); // пользователи ожидающие ввода кода
+const waitingForCode = new Set();
 
 // ------------------
 // utils
@@ -66,7 +66,36 @@ function getMessageLink(chat, messageId) {
 }
 
 // ------------------
-// /start
+// клавиатуры
+// ------------------
+const modeKeyboard = {
+  inline_keyboard: [
+    [
+      { text: "🎰 Слот", callback_data: "mode_slot" },
+      { text: "🎲 Кубик", callback_data: "mode_cube" },
+    ],
+    [
+      { text: "🏀 Баскетбол", callback_data: "mode_basket" },
+      { text: "🎯 Дартс", callback_data: "mode_darts" },
+    ],
+    [
+      { text: "🎳 Боулинг", callback_data: "mode_bowling" },
+      { text: "⚽️ Футбол", callback_data: "mode_football" },
+    ],
+  ],
+};
+
+const modeNames = {
+  slot: "🎰 Слот",
+  cube: "🎲 Кубик",
+  basket: "🏀 Баскетбол",
+  darts: "🎯 Дартс",
+  bowling: "🎳 Боулинг",
+  football: "⚽️ Футбол",
+};
+
+// ------------------
+// /start — в группе включает бота и показывает меню выбора режима
 // ------------------
 bot.onText(/\/start/, async (msg) => {
   if (msg.chat.type === "private") {
@@ -83,12 +112,50 @@ bot.onText(/\/start/, async (msg) => {
   if (!isAdmin(admins, msg.from.id)) return;
 
   botEnabled = true;
-  mode.set(chatId, "slot");
-  bot.sendMessage(chatId, "✅ Бот включён. Режим: slot");
+  const currentMode = mode.get(chatId);
+  const modeText = currentMode ? `Текущий режим: ${modeNames[currentMode]}` : "Режим не выбран";
+
+  bot.sendMessage(
+    chatId,
+    `✅ Бот включён!\n${modeText}\n\nВыбери режим игры:`,
+    { reply_markup: modeKeyboard }
+  );
 });
 
 // ------------------
-// /admin
+// /mode — показывает кнопки выбора режима
+// ------------------
+bot.onText(/\/mode/, async (msg) => {
+  if (!botEnabled || msg.chat.type === "private") return;
+
+  const chatId = msg.chat.id;
+  const admins = await getAdmins(chatId);
+  if (!isAdmin(admins, msg.from.id)) return;
+
+  const currentMode = mode.get(chatId);
+  const modeText = currentMode ? `Текущий режим: ${modeNames[currentMode]}` : "Режим не выбран";
+
+  bot.sendMessage(
+    chatId,
+    `🎮 ${modeText}\n\nВыбери новый режим:`,
+    { reply_markup: modeKeyboard }
+  );
+});
+
+// ------------------
+// /off
+// ------------------
+bot.onText(/\/off/, async (msg) => {
+  if (msg.chat.type === "private") return;
+  const chatId = msg.chat.id;
+  const admins = await getAdmins(chatId);
+  if (!isAdmin(admins, msg.from.id)) return;
+  botEnabled = false;
+  bot.sendMessage(chatId, "🛑 Бот выключен");
+});
+
+// ------------------
+// /admin — приватный чат
 // ------------------
 bot.onText(/\/admin/, async (msg) => {
   if (msg.chat.type !== "private") return;
@@ -104,7 +171,7 @@ bot.onText(/\/admin/, async (msg) => {
 });
 
 // ------------------
-// обработка всех текстовых сообщений (для ввода кода)
+// обработка ввода кода в приватном чате
 // ------------------
 bot.on("message", async (msg) => {
   if (msg.chat.type !== "private") return;
@@ -129,72 +196,60 @@ bot.on("message", async (msg) => {
 });
 
 // ------------------
-// /off
+// обработка нажатий на кнопки
 // ------------------
-bot.onText(/\/off/, async (msg) => {
-  if (msg.chat.type === "private") return;
+bot.on("callback_query", async (query) => {
+  const msg = query.message;
   const chatId = msg.chat.id;
-  const admins = await getAdmins(chatId);
-  if (!isAdmin(admins, msg.from.id)) return;
-  botEnabled = false;
-  bot.sendMessage(chatId, "🛑 Бот выключен");
-});
+  const userId = query.from.id;
 
-// ------------------
-// modes
-// ------------------
-bot.onText(/\/cube/, async (msg) => {
-  if (!botEnabled || msg.chat.type === "private") return;
-  const chatId = msg.chat.id;
-  const admins = await getAdmins(chatId);
-  if (!isAdmin(admins, msg.from.id)) return;
-  mode.set(chatId, "cube");
-  bot.sendMessage(chatId, "🎲 Режим КУБИКА включён");
-});
+  // Проверяем, что это групповой чат и бот включён
+  if (msg.chat.type === "private") {
+    return bot.answerCallbackQuery(query.id, { text: "❌ Это только для групп" });
+  }
 
-bot.onText(/\/slot/, async (msg) => {
-  if (!botEnabled || msg.chat.type === "private") return;
-  const chatId = msg.chat.id;
-  const admins = await getAdmins(chatId);
-  if (!isAdmin(admins, msg.from.id)) return;
-  mode.set(chatId, "slot");
-  bot.sendMessage(chatId, "🎰 Режим СЛОТА включён");
-});
+  if (!botEnabled) {
+    return bot.answerCallbackQuery(query.id, { text: "❌ Бот выключен. Напишите /start" });
+  }
 
-bot.onText(/\/basket/, async (msg) => {
-  if (!botEnabled || msg.chat.type === "private") return;
-  const chatId = msg.chat.id;
-  const admins = await getAdmins(chatId);
-  if (!isAdmin(admins, msg.from.id)) return;
-  mode.set(chatId, "basket");
-  bot.sendMessage(chatId, "🏀 Режим Баскетбола включён");
-});
+  // Проверяем права — только админ группы может менять режим
+  try {
+    const admins = await getAdmins(chatId);
+    if (!isAdmin(admins, userId)) {
+      return bot.answerCallbackQuery(query.id, { text: "❌ Только администраторы могут менять режим" });
+    }
+  } catch (e) {
+    return bot.answerCallbackQuery(query.id, { text: "❌ Ошибка проверки прав" });
+  }
 
-bot.onText(/\/darts/, async (msg) => {
-  if (!botEnabled || msg.chat.type === "private") return;
-  const chatId = msg.chat.id;
-  const admins = await getAdmins(chatId);
-  if (!isAdmin(admins, msg.from.id)) return;
-  mode.set(chatId, "darts");
-  bot.sendMessage(chatId, "🎯 Режим Дартса включён");
-});
+  const data = query.data;
 
-bot.onText(/\/bowling/, async (msg) => {
-  if (!botEnabled || msg.chat.type === "private") return;
-  const chatId = msg.chat.id;
-  const admins = await getAdmins(chatId);
-  if (!isAdmin(admins, msg.from.id)) return;
-  mode.set(chatId, "bowling");
-  bot.sendMessage(chatId, "🎳 Режим Боулинга включён");
-});
+  const modeMap = {
+    mode_slot: "slot",
+    mode_cube: "cube",
+    mode_basket: "basket",
+    mode_darts: "darts",
+    mode_bowling: "bowling",
+    mode_football: "football",
+  };
 
-bot.onText(/\/football/, async (msg) => {
-  if (!botEnabled || msg.chat.type === "private") return;
-  const chatId = msg.chat.id;
-  const admins = await getAdmins(chatId);
-  if (!isAdmin(admins, msg.from.id)) return;
-  mode.set(chatId, "football");
-  bot.sendMessage(chatId, "⚽️ Режим Футбол включён");
+  if (modeMap[data]) {
+    const selectedMode = modeMap[data];
+    mode.set(chatId, selectedMode);
+
+    // Отвечаем на callback (убираем "часики" на кнопке)
+    bot.answerCallbackQuery(query.id, { text: `✅ Режим ${modeNames[selectedMode]} включён!` });
+
+    // Редактируем сообщение с кнопками — показываем выбранный режим
+    bot.editMessageText(
+      `✅ Режим игры выбран: ${modeNames[selectedMode]}\n\nХочешь сменить? Нажми кнопку ниже:`,
+      {
+        chat_id: chatId,
+        message_id: msg.message_id,
+        reply_markup: modeKeyboard,
+      }
+    );
+  }
 });
 
 // ------------------
