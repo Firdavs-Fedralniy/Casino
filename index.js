@@ -352,6 +352,8 @@ bot.on("message", async (msg) => {
       const winner = lastMsg.get(chatId);
       if (!winner) return;
       lastMsg.delete(chatId);
+       mode.delete(chatId);
+  msgPerebivMinutes.delete(chatId);
 
       const winnerName = winner.username ? `@${winner.username}` : winner.firstName;
       const winnerLink = winner.username ? `https://t.me/${winner.username}` : `tg://user?id=${winner.userId}`;
@@ -561,7 +563,7 @@ bot.on("dice", async (msg) => {
         clearTimeout(prev.timeoutId);
         const prevName = prev.username ? `@${prev.username}` : prev.firstName;
         notifyAll(
-          `🔄 ${user.first_name} перебил ${prevName}!\n${triggerLabel}\n⏱ Новый таймер: ${mins} мин.`,
+          `🔄 ${user.first_name} перебил ${prevName}!\n${triggerLabel}\n⏱ Новый таймер: ${mins} мин.`,  
           `🔄 Перебив! ${user.first_name} перебил ${prevName}\n${triggerLabel}\n⏱ Новый таймер: ${mins} мин.`
         );
       } else {
@@ -575,6 +577,10 @@ bot.on("dice", async (msg) => {
         const winner = lastJackpot.get(chatId);
         if (!winner) return;
         lastJackpot.delete(chatId);
+        mode.delete(chatId); // ← добавь
+perebivMinutes.delete(chatId); // ← добавь
+slotSubMode.delete(chatId); // ← добавь
+slotTrigger.delete(chatId); // ← добавь
 
         const winnerName = winner.username ? `@${winner.username}` : winner.firstName;
         const winnerLink = winner.username ? `https://t.me/${winner.username}` : `tg://user?id=${winner.userId}`;
