@@ -394,6 +394,11 @@ bot.on("callback_query", async (query) => {
 // dice handler
 // ------------------
 bot.on("dice", async (msg) => {
+  
+  if (msg.dice.emoji === "🎰") {
+    bot.sendMessage(msg.chat.id, `🎰 Значение: ${msg.dice.value}`);
+  }
+
   if (!botEnabled) return;
 
   const chatId = msg.chat.id;
@@ -415,6 +420,7 @@ bot.on("dice", async (msg) => {
 
   // ---- SLOT ----
   if (currentMode === "slot" && msg.dice.emoji === "🎰") {
+    
     const trigger = slotTrigger.get(chatId);
     const sub = slotSubMode.get(chatId);
 
