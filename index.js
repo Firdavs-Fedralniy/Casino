@@ -169,14 +169,24 @@ const triggerKeyboard = {
 // ------------------
 bot.onText(/\/start/, async (msg) => {
   if (msg.chat.type === "private") {
-    return bot.sendMessage(
-      msg.chat.id,
-      "👋 Добро пожаловать!\n\n" +
-      "📌 Чтобы стать админом бота — напишите /admin\n" +
-      "📌 Чтобы использовать бота в группе — добавьте его туда и напишите /start в группе."
+    return bot.sendPhoto(
+    msg.chat.id,
+      fs.createReadStream("./flop.jpg"),
+      
+      {
+        caption:
+          "👋 Добро пожаловать мой дорогой друг!\n\n" +
+          "Добро пожаловать в мой бот лудоман. Бот создан для тригерринга игровых эмодзи и еще мини игры с слот машиной 🎰\n" +
+          "В будущем добавим еще новый мини игры пока что так.Бот уже готов приступает к работа 🎯\n" +
+          "Для адинов чтобы стать админо в лс боту и чтобы он отправлял вам уведомления в лс введите команду /admin 👮‍♂️\n" +
+          "Инструкцию по боту введите команду /help ➕\n" +
+          "Сделано @us1r_deleted"
+      }
     );
   }
-
+  //help
+  
+  // ...остальной код
   const chatId = msg.chat.id;
   const admins = await getAdmins(chatId);
   if (!isAdmin(admins, msg.from.id)) return;
@@ -186,6 +196,23 @@ bot.onText(/\/start/, async (msg) => {
   const modeText = currentMode ? `Текущий режим: ${modeNames[currentMode]}` : "Режим не выбран";
 
   bot.sendMessage(chatId, `✅ Бот включён!\n${modeText}\n\nВыбери режим игры:`, { reply_markup: modeKeyboard });
+});
+
+//help
+bot.onText(/\/help/, async (msg) => {
+  if (msg.chat.type !== "private") return;
+
+  bot.sendMessage(
+    msg.chat.id,
+    "📖 Инструкция по боту:\n\n" +
+    "1️⃣ Добавь бота в группу и напиши /start\n" +
+    "2️⃣ Выбери режим игры кнопками\n" +
+    "3️⃣ Для слота выбери Триггер или Перебив\n" +
+    "4️⃣ Выбери комбинацию для отслеживания\n\n" +
+    "Для получения уведомлений в лс — напиши /admin\n\n" +
+    "Перебив работает так- Введешь минуту и если на протяжении минуту не выбивают комбинациб которую ты выбрал то тот человек который выбил прошлый джекпот выигрывает\n\n" +
+    "Сделано @us1r_deleted"
+  );
 });
 
 // ------------------
