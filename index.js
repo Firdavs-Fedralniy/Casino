@@ -82,10 +82,10 @@ function isAdmin(admins, userId) {
 const triggerValues = {
   "777":   64,
   "bar":   1,
-  "lemon": 22,
-  "berry": 43,
+  "lemon": 43,
+  "berry": 22,
 };
-
+ 
 const triggerNames = {
   "777":   "7️⃣7️⃣7️⃣ 777",
   "bar":   "🅱️ BAR BAR BAR",
