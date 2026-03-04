@@ -42,10 +42,15 @@ const bot = new TelegramBot(TOKEN, { polling: true });
 
 let botEnabled = false;
 const mode = new Map();
-const slotSubMode = new Map();   // "jackpot" | "perebiv"
-const slotTrigger = new Map();   // "777" | "bar" | "lemon" | "berry" | "all"
+const slotSubMode = new Map();
+const slotTrigger = new Map();
 const perebivMinutes = new Map();
-const lastJackpot = new Map();   // { userId, firstName, username, timeoutId }
+const lastJackpot = new Map();
+
+// --- перебив сообщений ---
+const msgPerebivMinutes = new Map();  // минуты для перебива сообщений
+const lastMsg = new Map();            // { userId, firstName, username, timeoutId }
+const waitingForMsgMinutes = new Set();
 
 const waitingForCode = new Set();
 const waitingForMinutes = new Set();
@@ -73,10 +78,6 @@ function getMessageLink(chat, messageId) {
 
 // ------------------
 // Slot trigger values
-// 1  = BAR BAR BAR
-// 22 = Ежевика
-// 43 = Лимон
-// 64 = 777
 // ------------------
 const triggerValues = {
   "777":   64,
@@ -85,7 +86,6 @@ const triggerValues = {
   "berry": 22,
 };
 
-// все выигрышные значения слота
 const allWinValues = new Set([1, 22, 43, 64]);
 
 const triggerNames = {
@@ -96,7 +96,6 @@ const triggerNames = {
   "all":   "🎰 Все комбинации",
 };
 
-// получить название по значению
 function getTriggerNameByValue(val) {
   for (const [key, v] of Object.entries(triggerValues)) {
     if (v === val) return triggerNames[key];
@@ -111,6 +110,7 @@ const modeNames = {
   darts:    "🎯 Дартс",
   bowling:  "🎳 Боулинг",
   football: "⚽️ Футбол",
+  msgperebiv: "✉️ Перебив сообщений",
 };
 
 // ------------------
@@ -119,16 +119,19 @@ const modeNames = {
 const modeKeyboard = {
   inline_keyboard: [
     [
-      { text: "🎰 Слот",      callback_data: "mode_slot" },
-      { text: "🎲 Кубик",     callback_data: "mode_cube" },
+      { text: "🎰 Слот",                callback_data: "mode_slot" },
+      { text: "🎲 Кубик",               callback_data: "mode_cube" },
     ],
     [
-      { text: "🏀 Баскетбол", callback_data: "mode_basket" },
-      { text: "🎯 Дартс",     callback_data: "mode_darts" },
+      { text: "🏀 Баскетбол",           callback_data: "mode_basket" },
+      { text: "🎯 Дартс",               callback_data: "mode_darts" },
     ],
     [
-      { text: "🎳 Боулинг",   callback_data: "mode_bowling" },
-      { text: "⚽️ Футбол",   callback_data: "mode_football" },
+      { text: "🎳 Боулинг",             callback_data: "mode_bowling" },
+      { text: "⚽️ Футбол",             callback_data: "mode_football" },
+    ],
+    [
+      { text: "✉️ Перебив сообщений",   callback_data: "mode_msgperebiv" },
     ],
   ],
 };
@@ -170,23 +173,20 @@ const triggerKeyboard = {
 bot.onText(/\/start/, async (msg) => {
   if (msg.chat.type === "private") {
     return bot.sendPhoto(
-    msg.chat.id,
+      msg.chat.id,
       fs.createReadStream("./flop.jpg"),
-      
       {
         caption:
           "👋 Добро пожаловать мой дорогой друг!\n\n" +
           "Добро пожаловать в мой бот лудоман. Бот создан для тригерринга игровых эмодзи и еще мини игры с слот машиной 🎰\n" +
-          "В будущем добавим еще новый мини игры пока что так.Бот уже готов приступает к работа 🎯\n" +
-          "Для адинов чтобы стать админо в лс боту и чтобы он отправлял вам уведомления в лс введите команду /admin 👮‍♂️\n" +
+          "В будущем добавим еще новый мини игры пока что так. Бот уже готов приступает к работе 🎯\n" +
+          "Для админов чтобы стать админом в лс боту и чтобы он отправлял вам уведомления в лс введите команду /admin 👮‍♂️\n" +
           "Инструкцию по боту введите команду /help ➕\n" +
           "Сделано @us1r_deleted"
       }
     );
   }
-  //help
-  
-  // ...остальной код
+
   const chatId = msg.chat.id;
   const admins = await getAdmins(chatId);
   if (!isAdmin(admins, msg.from.id)) return;
@@ -198,7 +198,9 @@ bot.onText(/\/start/, async (msg) => {
   bot.sendMessage(chatId, `✅ Бот включён!\n${modeText}\n\nВыбери режим игры:`, { reply_markup: modeKeyboard });
 });
 
-//help
+// ------------------
+// /help
+// ------------------
 bot.onText(/\/help/, async (msg) => {
   if (msg.chat.type !== "private") return;
 
@@ -209,8 +211,9 @@ bot.onText(/\/help/, async (msg) => {
     "2️⃣ Выбери режим игры кнопками\n" +
     "3️⃣ Для слота выбери Триггер или Перебив\n" +
     "4️⃣ Выбери комбинацию для отслеживания\n\n" +
-    "5️⃣Для получения уведомлений в лс — напиши /admin\n\n" +
-    "6️⃣Перебив работает так- Введешь минуту и если на протяжении минуту не выбивают комбинациб которую ты выбрал то тот человек который выбил прошлый джекпот выигрывает\n\n" +
+    "5️⃣ Для получения уведомлений в лс — напиши /admin\n\n" +
+    "6️⃣ Перебив слота — введи минуты, если за это время никто не выбьет комбинацию, последний выбивший побеждает\n\n" +
+    "7️⃣ Перебив сообщений — введи минуты, последний написавший сообщение в группу за это время побеждает\n\n" +
     "Сделано @us1r_deleted"
   );
 });
@@ -238,6 +241,11 @@ bot.onText(/\/off/, async (msg) => {
   const admins = await getAdmins(chatId);
   if (!isAdmin(admins, msg.from.id)) return;
   botEnabled = false;
+  // сбрасываем перебив сообщений если был активен
+  if (lastMsg.has(chatId)) {
+    clearTimeout(lastMsg.get(chatId).timeoutId);
+    lastMsg.delete(chatId);
+  }
   bot.sendMessage(chatId, "🛑 Бот выключен");
 });
 
@@ -275,11 +283,14 @@ bot.on("message", async (msg) => {
     return;
   }
 
-  // группа — ввод минут перебива
-  if (!msg.text || msg.text.startsWith("/")) return;
-  const chatId = msg.chat.id;
+  if (!msg.text) return;
 
+  const chatId = msg.chat.id;
+  const currentMode = mode.get(chatId);
+
+  // группа — ввод минут перебива слота
   if (waitingForMinutes.has(chatId)) {
+    if (msg.text.startsWith("/")) return;
     const admins = await getAdmins(chatId);
     if (!isAdmin(admins, msg.from.id)) return;
 
@@ -292,11 +303,77 @@ bot.on("message", async (msg) => {
     perebivMinutes.set(chatId, minutes);
     slotSubMode.set(chatId, "perebiv");
 
-    bot.sendMessage(
+    return bot.sendMessage(
       chatId,
       `⏱ Время перебива: ${minutes} мин.\n\nВыбери комбинацию для отслеживания:`,
       { reply_markup: triggerKeyboard }
     );
+  }
+
+  // группа — ввод минут перебива сообщений
+  if (waitingForMsgMinutes.has(chatId)) {
+    if (msg.text.startsWith("/")) return;
+    const admins = await getAdmins(chatId);
+    if (!isAdmin(admins, msg.from.id)) return;
+
+    const minutes = parseInt(msg.text.trim());
+    if (isNaN(minutes) || minutes <= 0) {
+      return bot.sendMessage(chatId, "❌ Введи корректное число минут (например: 5)");
+    }
+
+    waitingForMsgMinutes.delete(chatId);
+    msgPerebivMinutes.set(chatId, minutes);
+
+    return bot.sendMessage(
+      chatId,
+      `✅ Перебив сообщений запущен!\n⏱ Время: ${minutes} мин.\n\nКто последним напишет сообщение и никто не перебьёт за ${minutes} мин. — тот победитель! 🏆`
+    );
+  }
+
+  // --- логика перебива сообщений ---
+  if (botEnabled && currentMode === "msgperebiv" && !msg.text.startsWith("/")) {
+    const mins = msgPerebivMinutes.get(chatId);
+    if (!mins) return;
+
+    const user = msg.from;
+    const prev = lastMsg.get(chatId);
+
+    // сбрасываем старый таймер молча (без уведомления)
+    if (prev && prev.timeoutId) {
+      clearTimeout(prev.timeoutId);
+    }
+
+    const groupLink = getGroupLink(msg.chat);
+    const messageLink = getMessageLink(msg.chat, msg.message_id);
+    const userLink = user.username ? `https://t.me/${user.username}` : `tg://user?id=${user.id}`;
+
+    // запускаем новый таймер
+    const timeoutId = setTimeout(() => {
+      const winner = lastMsg.get(chatId);
+      if (!winner) return;
+      lastMsg.delete(chatId);
+
+      const winnerName = winner.username ? `@${winner.username}` : winner.firstName;
+      const winnerLink = winner.username ? `https://t.me/${winner.username}` : `tg://user?id=${winner.userId}`;
+
+      // в группу
+      bot.sendMessage(chatId, `🏆 ПОБЕДИТЕЛЬ!\n${winnerName} написал последним и никто не перебил за ${mins} мин.! 👑`).catch(() => {});
+
+      // админам
+      for (const adminId of allowedAdmins) {
+        bot.sendMessage(
+          adminId,
+          `🏆 ПОБЕДИТЕЛЬ перебива сообщений!\nГруппа: "${msg.chat.title}"\n\n👤 ${winnerName} написал последним — никто не перебил за ${mins} мин.!\n\n🔗 Игрок: ${winnerLink}\n🔗 Группа: ${groupLink}`
+        ).catch(() => {});
+      }
+    }, mins * 60 * 1000);
+
+    lastMsg.set(chatId, {
+      userId: user.id,
+      firstName: user.first_name,
+      username: user.username || null,
+      timeoutId,
+    });
   }
 });
 
@@ -343,10 +420,20 @@ bot.on("callback_query", async (query) => {
   const modeMap = {
     mode_slot: "slot", mode_cube: "cube", mode_basket: "basket",
     mode_darts: "darts", mode_bowling: "bowling", mode_football: "football",
+    mode_msgperebiv: "msgperebiv",
   };
 
   if (modeMap[data]) {
     const selectedMode = modeMap[data];
+
+    // если переключаемся с перебива сообщений — сбрасываем
+    if (mode.get(chatId) === "msgperebiv" && selectedMode !== "msgperebiv") {
+      if (lastMsg.has(chatId)) {
+        clearTimeout(lastMsg.get(chatId).timeoutId);
+        lastMsg.delete(chatId);
+      }
+    }
+
     mode.set(chatId, selectedMode);
     bot.answerCallbackQuery(query.id, { text: `✅ Режим ${modeNames[selectedMode]} включён!` });
 
@@ -354,6 +441,14 @@ bot.on("callback_query", async (query) => {
       return bot.editMessageText("🎰 Режим СЛОТ выбран!\n\nВыбери тип отслеживания:", {
         chat_id: chatId, message_id: msg.message_id, reply_markup: slotSubModeKeyboard
       });
+    }
+
+    if (selectedMode === "msgperebiv") {
+      waitingForMsgMinutes.add(chatId);
+      return bot.editMessageText(
+        "✉️ Режим: Перебив сообщений\n\n✍️ Напиши в чат количество минут для перебива:",
+        { chat_id: chatId, message_id: msg.message_id }
+      );
     }
 
     return bot.editMessageText(
@@ -420,11 +515,8 @@ bot.on("dice", async (msg) => {
   const groupLink = getGroupLink(msg.chat);
   const messageLink = getMessageLink(msg.chat, msg.message_id);
 
-  // уведомление и админам и в группу
   const notifyAll = (groupText, adminText) => {
-    // в группу
     bot.sendMessage(chatId, groupText).catch(() => {});
-    // админам
     for (const adminId of allowedAdmins) {
       bot.sendMessage(
         adminId,
@@ -440,7 +532,6 @@ bot.on("dice", async (msg) => {
 
     if (!trigger || !sub) return;
 
-    // проверяем попадание
     let isWin = false;
     if (trigger === "all") {
       isWin = allWinValues.has(value);
@@ -450,10 +541,8 @@ bot.on("dice", async (msg) => {
 
     if (!isWin) return;
 
-    // определяем название выбитой комбинации
     const triggerLabel = trigger === "all" ? getTriggerNameByValue(value) : triggerNames[trigger];
 
-    // --- Режим: триггер ---
     if (sub === "jackpot") {
       notifyAll(
         `🎰 Игрок ${user.first_name} выбил ${triggerLabel}`,
@@ -462,7 +551,6 @@ bot.on("dice", async (msg) => {
       return;
     }
 
-    // --- Режим: перебив ---
     if (sub === "perebiv") {
       const mins = perebivMinutes.get(chatId);
       if (!mins) return;
