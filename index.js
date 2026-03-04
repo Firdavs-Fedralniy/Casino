@@ -395,9 +395,7 @@ bot.on("callback_query", async (query) => {
 // ------------------
 bot.on("dice", async (msg) => {
   
-  if (msg.dice.emoji === "🎰") {
-    bot.sendMessage(msg.chat.id, `🎰 Значение: ${msg.dice.value}`);
-  }
+  
 
   if (!botEnabled) return;
 
