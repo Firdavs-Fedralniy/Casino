@@ -1,6 +1,6 @@
 """
 bank.py — Userbot-банк на Pyrogram
-При старте сам загружает все доступные подарки в пул и выбирает рандомно
+Загружает подарки которые реально есть на аккаунте-банке
 """
 
 import asyncio
@@ -10,7 +10,7 @@ import random
 from aiohttp import web
 from pyrogram import Client
 from pyrogram.errors import PeerIdInvalid, FloodWait
-from pyrogram.raw import functions
+from pyrogram.raw import functions, types
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -30,16 +30,9 @@ SESSION_STRING = os.getenv("SESSION_STRING", "")
 BANK_PORT      = int(os.getenv("BANK_PORT", "8080"))
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret")
 
-# Пул загружается автоматически при старте
-# Можно добавить вручную резервные gift_id на случай если API не ответит
-FALLBACK_GIFT_IDS = [
-    5170145012310081615,  # 15⭐ обычный
-    5170250947678437525,  # 25⭐ обычный
-    5170144170496491616,  # 50⭐ обычный
-]
-
-# Пул — заполняется при старте автоматически
-gift_pool: list[int] = []
+# Пул — заполняется при старте из профиля аккаунта
+# Каждый элемент: {"gift_id": int, "msg_id": int}
+gift_pool: list[dict] = []
 
 # --------------------------------------------------
 # Pyrogram client
@@ -52,32 +45,50 @@ app = Client(
 )
 
 # --------------------------------------------------
-# Загрузка пула подарков
+# Загрузка подарков с аккаунта банка
 # --------------------------------------------------
 async def load_gift_pool():
     global gift_pool
     try:
-        result = await app.invoke(functions.payments.GetStarGifts(hash=0))
-        gift_pool = [g.id for g in result.gifts]
-        log.info(f"🎁 Пул загружен: {len(gift_pool)} подарков")
-        for g in result.gifts:
-            limited = "⭐ Лимитир." if getattr(g, "limited", False) else "📦 Обычный"
-            log.info(f"  {limited} | {g.id} | {g.stars}⭐")
+        # Получаем подарки из профиля аккаунта-банка
+        result = await app.invoke(
+            functions.payments.GetSavedStarGifts(
+                peer=await app.resolve_peer("me"),
+                offset="",
+                limit=100,
+            )
+        )
+        gift_pool = []
+        for gift in result.gifts:
+            # Только не проданные и не переведённые
+            if not getattr(gift, "unsaved", False):
+                gift_pool.append({
+                    "gift_id": gift.gift.id,
+                    "msg_id":  gift.msg_id,
+                    "stars":   gift.gift.stars,
+                })
+
+        log.info(f"🎁 Подарков на аккаунте: {len(gift_pool)}")
+        for g in gift_pool:
+            log.info(f"  gift_id={g['gift_id']} | {g['stars']}⭐ | msg_id={g['msg_id']}")
+
     except Exception as e:
-        log.warning(f"⚠️ Не удалось загрузить пул: {e}")
-        log.warning("⚠️ Используем резервные gift_id")
-        gift_pool = FALLBACK_GIFT_IDS.copy()
+        log.warning(f"⚠️ Не удалось загрузить подарки с аккаунта: {e}")
+        log.warning("⚠️ Пул пуст — пополни подарки на аккаунте банка")
+        gift_pool = []
 
 # --------------------------------------------------
 # Отправка рандомного подарка
 # --------------------------------------------------
 async def send_random_gift(user_id: int, winner_name: str):
     if not gift_pool:
-        log.error("❌ Пул подарков пуст!")
+        log.error("❌ Пул подарков пуст! Пополни аккаунт-банк подарками.")
         return
 
-    gift_id = random.choice(gift_pool)
-    log.info(f"🎲 Выбран подарок {gift_id} для {winner_name} ({user_id})")
+    # Берём рандомный подарок из пула
+    chosen = random.choice(gift_pool)
+    gift_id = chosen["gift_id"]
+    log.info(f"🎲 Выбран подарок {gift_id} ({chosen['stars']}⭐) для {winner_name} ({user_id})")
 
     try:
         await app.send_gift(
@@ -85,7 +96,9 @@ async def send_random_gift(user_id: int, winner_name: str):
             gift_id=gift_id,
             text=f"🏆 Поздравляем с победой, {winner_name}! Держи свой приз 🎁"
         )
-        log.info(f"✅ Подарок {gift_id} отправлен → {winner_name} ({user_id})")
+        # Убираем из пула после отправки
+        gift_pool.remove(chosen)
+        log.info(f"✅ Подарок {gift_id} отправлен → {winner_name} | Осталось в пуле: {len(gift_pool)}")
 
     except FloodWait as e:
         log.warning(f"⏳ FloodWait {e.value}s — ждём...")
@@ -97,19 +110,6 @@ async def send_random_gift(user_id: int, winner_name: str):
 
     except Exception as e:
         log.error(f"❌ Ошибка отправки: {e}")
-        # Пробуем резервный подарок
-        if gift_id not in FALLBACK_GIFT_IDS and FALLBACK_GIFT_IDS:
-            log.info("🔄 Пробуем резервный подарок...")
-            fallback_id = random.choice(FALLBACK_GIFT_IDS)
-            try:
-                await app.send_gift(
-                    user_id=user_id,
-                    gift_id=fallback_id,
-                    text=f"🏆 Поздравляем с победой, {winner_name}! Держи свой приз 🎁"
-                )
-                log.info(f"✅ Резервный подарок {fallback_id} отправлен → {winner_name}")
-            except Exception as e2:
-                log.error(f"❌ Резервный тоже не сработал: {e2}")
 
 # --------------------------------------------------
 # Webhook handler
@@ -139,10 +139,15 @@ async def handle_webhook(request: web.Request):
 
 
 async def handle_health(request: web.Request):
-    return web.json_response({"ok": True, "status": "bank is running", "pool_size": len(gift_pool)})
+    gifts_info = [{"gift_id": g["gift_id"], "stars": g["stars"]} for g in gift_pool]
+    return web.json_response({
+        "ok": True,
+        "status": "bank is running",
+        "pool_size": len(gift_pool),
+        "gifts": gifts_info,
+    })
 
 
-# Обновить пул вручную — GET /reload
 async def handle_reload(request: web.Request):
     secret = request.headers.get("X-Secret", "")
     if secret != WEBHOOK_SECRET:
@@ -166,7 +171,6 @@ async def main():
     me = await app.get_me()
     log.info(f"✅ Userbot: {me.first_name} (@{me.username})")
 
-    # Загружаем пул при старте
     await load_gift_pool()
 
     web_app = web.Application()
