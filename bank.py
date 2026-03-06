@@ -62,10 +62,11 @@ async def load_gift_pool():
         for gift in result.gifts:
             # Только не проданные и не переведённые
             if not getattr(gift, "unsaved", False):
+                stars = getattr(gift.gift, "stars", None) or getattr(gift.gift, "star_count", 0)
                 gift_pool.append({
                     "gift_id": gift.gift.id,
                     "msg_id":  gift.msg_id,
-                    "stars":   gift.gift.stars,
+                    "stars":   stars,
                 })
 
         log.info(f"🎁 Подарков на аккаунте: {len(gift_pool)}")
