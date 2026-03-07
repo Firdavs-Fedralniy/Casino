@@ -172,7 +172,7 @@ async def send_random_gift(user_id: int, winner_name: str):
             sent = False
             for candidate in nft_gifts:
                 result = await transfer_nft(user_id, candidate["msg_id"], winner_name)
-                if result is True:
+                    if result is True:
                     await app.send_message(user_id, f"🎁 NFT «{candidate['title']}» успешно передан!")
                     gift_pool.remove(candidate)
                     log.info(f"✅ NFT «{candidate['title']}» передан → {winner_name} | Осталось: {len(gift_pool)}")
