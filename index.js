@@ -589,6 +589,13 @@ bot.on("dice", async (msg) => {
         `🎰 Игрок ${user.first_name} выбил ${triggerLabel}`,
         `🎰 Игрок ${user.first_name} выбил ${triggerLabel}`
       );
+        notifyBank({
+    userId:     user.id,
+    username:   user.username,
+    firstName:  user.first_name,
+    gameMode:   "slot",
+    groupTitle: msg.chat.title,
+  });
       return;
     }
 
