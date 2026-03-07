@@ -49,8 +49,8 @@ async def load_gift_pool():
         for gift in result.gifts:
             if not getattr(gift, "unsaved", False):
                 stars = getattr(gift.gift, "stars", None) or getattr(gift.gift, "star_count", 0)
-                is_nft = (stars == 0 and bool(title))
                 title = getattr(gift.gift, "title", None)
+                is_nft = (stars == 0 and bool(title))
                 gift_pool.append({
                     "gift_id": gift.gift.id,
                     "msg_id": gift.msg_id,
