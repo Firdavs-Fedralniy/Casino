@@ -87,7 +87,7 @@ async def transfer_nft(user_id: int, msg_id: int):
         peer = await app.resolve_peer(user_id)
         await app.invoke(
             functions.payments.TransferStarGift(
-                user_id=peer,
+                to_id=peer,
                 msg_id=msg_id,
             )
         )
