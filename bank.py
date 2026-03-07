@@ -82,7 +82,7 @@ async def load_gift_pool():
 # --------------------------------------------------
 # Передача NFT
 # --------------------------------------------------
-async def transfer_nft(user_id: int, msg_id: int):
+async def transfer_nft(user_id: int, msg_id: int, winner_name: str):
     try:
         peer = await app.resolve_peer(user_id)
         await app.invoke(
@@ -93,14 +93,26 @@ async def transfer_nft(user_id: int, msg_id: int):
         )
         log.info(f"✅ NFT (msg_id={msg_id}) передан пользователю {user_id}")
         return True
+
     except FloodWait as e:
         log.warning(f"⏳ FloodWait {e.value}s...")
         await asyncio.sleep(e.value)
-        return await transfer_nft(user_id, msg_id)
+        return await transfer_nft(user_id, msg_id, winner_name)
+
     except PeerIdInvalid:
         log.error(f"❌ Пользователь {user_id} не найден")
         return False
+
     except Exception as e:
+        err = str(e)
+        if "STARGIFT_TRANSFER_TOO_EARLY" in err:
+            # Извлекаем секунды из ошибки
+            import re
+            match = re.search(r'TOO_EARLY_(\d+)', err)
+            seconds = int(match.group(1)) if match else "?"
+            hours = round(int(seconds) / 3600, 1) if match else "?"
+            log.warning(f"⏳ NFT msg_id={msg_id} ещё заблокирован на {seconds}с ({hours}ч) — пробуем другой")
+            return "too_early"
         log.error(f"❌ Ошибка передачи NFT: {e}")
         return False
 
@@ -139,20 +151,38 @@ async def send_random_gift(user_id: int, winner_name: str):
 
     try:
         if is_nft:
-            # Сначала шлём сообщение
             await app.send_message(
                 user_id,
                 f"🏆 Поздравляем, {winner_name}!\n\n"
-                f"Ты выбил джекпот и получаешь уникальный NFT подарок! 🖼\n"
-                f"🎁 «{title}»\n\n"
-                f"Передаю тебе NFT прямо сейчас... 👇"
+                f"Ты выбил джекпот и получаешь уникальный NFT! 🖼\n"
+                f"Передаю прямо сейчас... 👇"
             )
-            ok = await transfer_nft(user_id, msg_id)
-            if ok:
-                gift_pool.remove(chosen)
-                log.info(f"✅ NFT «{title}» передан → {winner_name} | Осталось: {len(gift_pool)}")
-            else:
-                await app.send_message(user_id, "❌ Не удалось передать NFT. Свяжитесь с администратором.")
+
+            nft_gifts = [g for g in gift_pool if g["is_nft"]]
+            sent = False
+            for candidate in nft_gifts:
+                result = await transfer_nft(user_id, candidate["msg_id"], winner_name)
+                if result is True:
+                    await app.send_message(user_id, f"🎁 NFT «{candidate['title']}» успешно передан!")
+                    gift_pool.remove(candidate)
+                    log.info(f"✅ NFT «{candidate['title']}» передан → {winner_name} | Осталось: {len(gift_pool)}")
+                    sent = True
+                    break
+                elif result == "too_early":
+                    log.warning(f"⏳ NFT «{candidate['title']}» заблокирован — пробуем следующий")
+                    continue
+                else:
+                    break
+
+            if not sent:
+                log.warning("⚠️ Все NFT заблокированы — отправляем обычный подарок")
+                regular = next((g for g in gift_pool if not g["is_nft"]), None)
+                if regular:
+                    await app.send_gift(chat_id=user_id, gift_id=regular["gift_id"])
+                    gift_pool.remove(regular)
+                    await app.send_message(user_id, f"🎁 NFT временно недоступен, отправили подарок {regular['stars']}⭐!")
+                else:
+                    await app.send_message(user_id, "❌ Нет доступных подарков. Свяжитесь с администратором.")
 
         else:
             await app.send_message(
