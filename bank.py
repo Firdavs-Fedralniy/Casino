@@ -92,11 +92,11 @@ async def send_random_gift(user_id: int, winner_name: str):
     log.info(f"🎲 Выбран подарок {gift_id} ({chosen['stars']}⭐) для {winner_name} ({user_id})")
 
     try:
-       await app.send_gift(
-    chat_id=user_id,
-    gift_id=gift_id,
-    text=f"🏆 Поздравляем с победой, {winner_name}! Держи свой приз 🎁"
-)
+        await app.send_gift(
+            chat_id=user_id,
+            gift_id=gift_id,
+            text=f"🏆 Поздравляем с победой, {winner_name}! Держи свой приз 🎁"
+        )
         # Убираем из пула после отправки
         gift_pool.remove(chosen)
         log.info(f"✅ Подарок {gift_id} отправлен → {winner_name} | Осталось в пуле: {len(gift_pool)}")
