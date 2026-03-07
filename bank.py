@@ -30,8 +30,6 @@ SESSION_STRING = os.getenv("SESSION_STRING", "")
 BANK_PORT      = int(os.getenv("BANK_PORT", "8080"))
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret")
 
-# Пул — заполняется при старте из профиля аккаунта
-# Каждый элемент: {"gift_id": int, "msg_id": int}
 gift_pool: list[dict] = []
 
 # --------------------------------------------------
@@ -50,7 +48,6 @@ app = Client(
 async def load_gift_pool():
     global gift_pool
     try:
-        # Получаем подарки из профиля аккаунта-банка
         result = await app.invoke(
             functions.payments.GetSavedStarGifts(
                 peer=await app.resolve_peer("me"),
@@ -60,7 +57,6 @@ async def load_gift_pool():
         )
         gift_pool = []
         for gift in result.gifts:
-            # Только не проданные и не переведённые
             if not getattr(gift, "unsaved", False):
                 stars = getattr(gift.gift, "stars", None) or getattr(gift.gift, "star_count", 0)
                 gift_pool.append({
@@ -102,13 +98,11 @@ async def send_random_gift(user_id: int, winner_name: str):
             pass
         return
 
-
-    # Берём рандомный подарок из пула
     chosen = random.choice(gift_pool)
     gift_id = chosen["gift_id"]
     log.info(f"🎲 Выбран подарок {gift_id} ({chosen['stars']}⭐) для {winner_name} ({user_id})")
 
-try:
+    try:
         await app.send_message(
             user_id,
             f"🏆 Поздравляем, {winner_name}!\n\n"
@@ -163,10 +157,12 @@ async def handle_webhook(request: web.Request):
 
 async def handle_health(request: web.Request):
     gifts_info = [{"gift_id": g["gift_id"], "stars": g["stars"]} for g in gift_pool]
+    total_stars = sum(g.get("stars", 0) for g in gift_pool)
     return web.json_response({
         "ok": True,
         "status": "bank is running",
         "pool_size": len(gift_pool),
+        "total_stars": total_stars,
         "gifts": gifts_info,
     })
 
