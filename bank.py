@@ -95,7 +95,6 @@ async def send_random_gift(user_id: int, winner_name: str):
         await app.send_gift(
             chat_id=user_id,
             gift_id=gift_id,
-            text=f"🏆 Поздравляем с победой, {winner_name}! Держи свой приз 🎁"
         )
         # Убираем из пула после отправки
         gift_pool.remove(chosen)
