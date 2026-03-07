@@ -59,27 +59,57 @@ async def load_gift_pool():
         for gift in result.gifts:
             if not getattr(gift, "unsaved", False):
                 stars = getattr(gift.gift, "stars", None) or getattr(gift.gift, "star_count", 0)
+                # NFT = у подарка есть availability_total (лимитированный выпуск)
+                is_nft = getattr(gift.gift, "availability_total", None) is not None
+                title  = getattr(gift.gift, "title", None)
                 gift_pool.append({
                     "gift_id": gift.gift.id,
                     "msg_id":  gift.msg_id,
                     "stars":   stars,
+                    "is_nft":  is_nft,
+                    "title":   title or ("NFT" if is_nft else "Подарок"),
                 })
 
         log.info(f"🎁 Подарков на аккаунте: {len(gift_pool)}")
         for g in gift_pool:
-            log.info(f"  gift_id={g['gift_id']} | {g['stars']}⭐ | msg_id={g['msg_id']}")
+            kind = "🖼 NFT" if g["is_nft"] else "🎁 обычный"
+            log.info(f"  {kind} | gift_id={g['gift_id']} | {g['stars']}⭐ | msg_id={g['msg_id']} | {g['title']}")
 
     except Exception as e:
         log.warning(f"⚠️ Не удалось загрузить подарки с аккаунта: {e}")
-        log.warning("⚠️ Пул пуст — пополни подарки на аккаунте банка")
         gift_pool = []
+
+# --------------------------------------------------
+# Передача NFT
+# --------------------------------------------------
+async def transfer_nft(user_id: int, msg_id: int):
+    try:
+        peer = await app.resolve_peer(user_id)
+        await app.invoke(
+            functions.payments.TransferStarGift(
+                user_id=peer,
+                msg_id=msg_id,
+            )
+        )
+        log.info(f"✅ NFT (msg_id={msg_id}) передан пользователю {user_id}")
+        return True
+    except FloodWait as e:
+        log.warning(f"⏳ FloodWait {e.value}s...")
+        await asyncio.sleep(e.value)
+        return await transfer_nft(user_id, msg_id)
+    except PeerIdInvalid:
+        log.error(f"❌ Пользователь {user_id} не найден")
+        return False
+    except Exception as e:
+        log.error(f"❌ Ошибка передачи NFT: {e}")
+        return False
 
 # --------------------------------------------------
 # Отправка рандомного подарка
 # --------------------------------------------------
 async def send_random_gift(user_id: int, winner_name: str):
     if not gift_pool:
-        log.error("❌ Пул подарков пуст! Пополни аккаунт-банк подарками.")
+        log.error("❌ Пул подарков пуст!")
         try:
             await app.send_message(user_id, "⚠️ В банке закончились подарки. Свяжитесь с администратором.")
         except Exception:
@@ -88,34 +118,53 @@ async def send_random_gift(user_id: int, winner_name: str):
 
     total_stars = sum(g.get("stars", 0) for g in gift_pool)
     if total_stars < 25:
-        log.warning(f"⚠️ Мало звёзд в банке: {total_stars}⭐ (минимум 25). Пополни подарки!")
+        log.warning(f"⚠️ Мало звёзд в банке: {total_stars}⭐")
         try:
             await app.send_message(
                 user_id,
-                "⚠️ К сожалению, в банке закончились звёзды.\nПожалуйста, свяжитесь с администратором."
+                f"⚠️ В банке осталось мало звёзд ({total_stars}⭐).\nПожалуйста, свяжитесь с администратором."
             )
         except Exception:
             pass
         return
 
-    chosen = random.choice(gift_pool)
+    chosen  = random.choice(gift_pool)
     gift_id = chosen["gift_id"]
-    log.info(f"🎲 Выбран подарок {gift_id} ({chosen['stars']}⭐) для {winner_name} ({user_id})")
+    msg_id  = chosen["msg_id"]
+    is_nft  = chosen["is_nft"]
+    title   = chosen["title"]
+    stars   = chosen["stars"]
+
+    log.info(f"🎲 Выбран {'NFT' if is_nft else 'подарок'} «{title}» ({stars}⭐) для {winner_name} ({user_id})")
 
     try:
-        await app.send_message(
-            user_id,
-            f"🏆 Поздравляем, {winner_name}!\n\n"
-            f"Ты выбил джекпот и получаешь подарок 🎁\n"
-            f"Стоимость: {chosen['stars']}⭐\n\n"
-            f"Держи свой приз! 👇"
-        )
-        await app.send_gift(
-            chat_id=user_id,
-            gift_id=gift_id,
-        )
-        gift_pool.remove(chosen)
-        log.info(f"✅ Подарок {gift_id} отправлен → {winner_name} | Осталось в пуле: {len(gift_pool)}")
+        if is_nft:
+            # Сначала шлём сообщение
+            await app.send_message(
+                user_id,
+                f"🏆 Поздравляем, {winner_name}!\n\n"
+                f"Ты выбил джекпот и получаешь уникальный NFT подарок! 🖼\n"
+                f"🎁 «{title}»\n\n"
+                f"Передаю тебе NFT прямо сейчас... 👇"
+            )
+            ok = await transfer_nft(user_id, msg_id)
+            if ok:
+                gift_pool.remove(chosen)
+                log.info(f"✅ NFT «{title}» передан → {winner_name} | Осталось: {len(gift_pool)}")
+            else:
+                await app.send_message(user_id, "❌ Не удалось передать NFT. Свяжитесь с администратором.")
+
+        else:
+            await app.send_message(
+                user_id,
+                f"🏆 Поздравляем, {winner_name}!\n\n"
+                f"Ты выбил джекпот и получаешь подарок 🎁\n"
+                f"Стоимость: {stars}⭐\n\n"
+                f"Держи свой приз! 👇"
+            )
+            await app.send_gift(chat_id=user_id, gift_id=gift_id)
+            gift_pool.remove(chosen)
+            log.info(f"✅ Подарок {gift_id} отправлен → {winner_name} | Осталось: {len(gift_pool)}")
 
     except FloodWait as e:
         log.warning(f"⏳ FloodWait {e.value}s — ждём...")
@@ -156,14 +205,21 @@ async def handle_webhook(request: web.Request):
 
 
 async def handle_health(request: web.Request):
-    gifts_info = [{"gift_id": g["gift_id"], "stars": g["stars"]} for g in gift_pool]
+    gifts_info = []
+    for g in gift_pool:
+        gifts_info.append({
+            "gift_id": g["gift_id"],
+            "stars":   g["stars"],
+            "is_nft":  g["is_nft"],
+            "title":   g["title"],
+        })
     total_stars = sum(g.get("stars", 0) for g in gift_pool)
     return web.json_response({
-        "ok": True,
-        "status": "bank is running",
-        "pool_size": len(gift_pool),
+        "ok":          True,
+        "status":      "bank is running",
+        "pool_size":   len(gift_pool),
         "total_stars": total_stars,
-        "gifts": gifts_info,
+        "gifts":       gifts_info,
     })
 
 
