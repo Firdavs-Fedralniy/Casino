@@ -184,15 +184,12 @@ async def send_random_gift(user_id: int, winner_name: str):
                 else:
                     break
 
-            if not sent:
-                log.warning("⚠️ Все NFT заблокированы — отправляем обычный подарок")
-                regular = next((g for g in gift_pool if not g["is_nft"]), None)
-                if regular:
-                    await app.send_gift(chat_id=user_id, gift_id=regular["gift_id"])
-                    gift_pool.remove(regular)
-                    await app.send_message(user_id, f"🎁 NFT временно недоступен, отправили подарок {regular['stars']}⭐!")
-                else:
-                    await app.send_message(user_id, "❌ Нет доступных подарков. Свяжитесь с администратором.")
+          if not sent:
+                log.warning("⚠️ Все NFT заблокированы — ничего не отправляем")
+                try:
+                    await app.send_message(user_id, "⚠️ NFT временно недоступен. Свяжитесь с администратором.")
+                except Exception:
+                    pass
 
         else:
             await app.send_message(
