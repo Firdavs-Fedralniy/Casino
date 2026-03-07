@@ -84,16 +84,19 @@ async def load_gift_pool():
 async def send_random_gift(user_id: int, winner_name: str):
     if not gift_pool:
         log.error("❌ Пул подарков пуст! Пополни аккаунт-банк подарками.")
+        try:
+            await app.send_message(user_id, "⚠️ В банке закончились подарки. Свяжитесь с администратором.")
+        except Exception:
+            pass
         return
 
-        total_stars = sum(g.get("stars", 0) for g in gift_pool)
+    total_stars = sum(g.get("stars", 0) for g in gift_pool)
     if total_stars < 25:
         log.warning(f"⚠️ Мало звёзд в банке: {total_stars}⭐ (минимум 25). Пополни подарки!")
-        # Уведомляем победителя что банк пуст
         try:
             await app.send_message(
                 user_id,
-                f"⚠️ К сожалению, в банке закончились звёзды.\nПожалуйста, свяжитесь с администратором."
+                "⚠️ К сожалению, в банке закончились звёзды.\nПожалуйста, свяжитесь с администратором."
             )
         except Exception:
             pass
@@ -106,6 +109,13 @@ async def send_random_gift(user_id: int, winner_name: str):
     log.info(f"🎲 Выбран подарок {gift_id} ({chosen['stars']}⭐) для {winner_name} ({user_id})")
 
     try:
+         await app.send_message(
+            user_id,
+            f"🏆 Поздравляем, {winner_name}!\n\n"
+            f"Ты выбил джекпот и получаешь подарок 🎁\n"
+            f"Стоимость: {stars}⭐\n\n"
+            f"Держи свой приз! 👇"
+        )
         await app.send_gift(
             chat_id=user_id,
             gift_id=gift_id,
