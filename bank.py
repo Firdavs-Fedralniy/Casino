@@ -86,6 +86,20 @@ async def send_random_gift(user_id: int, winner_name: str):
         log.error("❌ Пул подарков пуст! Пополни аккаунт-банк подарками.")
         return
 
+        total_stars = sum(g.get("stars", 0) for g in gift_pool)
+    if total_stars < 25:
+        log.warning(f"⚠️ Мало звёзд в банке: {total_stars}⭐ (минимум 25). Пополни подарки!")
+        # Уведомляем победителя что банк пуст
+        try:
+            await app.send_message(
+                user_id,
+                f"⚠️ К сожалению, в банке закончились звёзды.\nПожалуйста, свяжитесь с администратором."
+            )
+        except Exception:
+            pass
+        return
+
+
     # Берём рандомный подарок из пула
     chosen = random.choice(gift_pool)
     gift_id = chosen["gift_id"]

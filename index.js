@@ -546,6 +546,7 @@ bot.on("callback_query", async (query) => {
 // ------------------
 bot.on("dice", async (msg) => {
   if (!botEnabled) return;
+    if (msg.forward_date || msg.forward_origin) return;
 
   const chatId = msg.chat.id;
   const currentMode = mode.get(chatId);
