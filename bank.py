@@ -245,6 +245,8 @@ async def main():
     await app.start()
     me = await app.get_me()
     log.info(f"✅ Userbot: {me.first_name} (@{me.username})")
+       import inspect
+    log.info(f"DEBUG TransferStarGift: {inspect.signature(functions.payments.TransferStarGift.__init__)}")
 
     await load_gift_pool()
 
