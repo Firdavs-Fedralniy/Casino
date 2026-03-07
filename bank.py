@@ -140,7 +140,17 @@ async def send_random_gift(user_id: int, winner_name: str):
             pass
         return
 
-    chosen  = random.choice(gift_pool)
+    # ТЕСТ — всегда первый NFT
+    nft_gifts = [g for g in gift_pool if g["is_nft"]]
+    if not nft_gifts:
+        log.error("❌ NFT в пуле нет!")
+        try:
+            await app.send_message(user_id, "❌ NFT закончились. Свяжитесь с администратором.")
+        except Exception:
+            pass
+        return
+
+    chosen  = nft_gifts[0]
     gift_id = chosen["gift_id"]
     msg_id  = chosen["msg_id"]
     is_nft  = chosen["is_nft"]
