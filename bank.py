@@ -70,13 +70,13 @@ async def load_gift_pool():
 async def transfer_nft(user_id: int, msg_id: int, winner_name: str):
     try:
         peer = await app.resolve_peer(user_id)
-       await app.invoke(
-    functions.payments.TransferStarGift(
-        stargeft=types.InputSavedStarGiftUser(msg_id=msg_id),
-        to_id=peer,
-        stars=25,
-    )
-)
+        await app.invoke(
+            functions.payments.TransferStarGift(
+                stargift=types.InputSavedStarGiftUser(msg_id=msg_id),
+                to_id=peer,
+                stars=25,
+            )
+        )
         log.info(f"✅ NFT (msg_id={msg_id}) передан пользователю {user_id}")
         return True
     except FloodWait as e:
@@ -108,16 +108,6 @@ async def send_random_gift(user_id: int, winner_name: str):
             pass
         return
 
-    total_stars = sum(g.get("stars", 0) for g in gift_pool)
-    if total_stars < 25:
-        log.warning(f"⚠️ Мало звёзд в банке: {total_stars}⭐")
-        try:
-            await app.send_message(user_id, f"⚠️ В банке мало звёзд ({total_stars}⭐). Свяжитесь с администратором.")
-        except Exception:
-            pass
-        return
-
-    # ТЕСТ — всегда первый NFT
     nft_gifts = [g for g in gift_pool if g["is_nft"]]
     if not nft_gifts:
         log.error("❌ NFT в пуле нет!")
@@ -127,14 +117,7 @@ async def send_random_gift(user_id: int, winner_name: str):
             pass
         return
 
-    chosen = nft_gifts[0]
-    gift_id = chosen["gift_id"]
-    msg_id = chosen["msg_id"]
-    is_nft = chosen["is_nft"]
-    title = chosen["title"]
-    stars = chosen["stars"]
-
-    log.info(f"🎲 Выбран NFT «{title}» ({stars}⭐) для {winner_name} ({user_id})")
+    log.info(f"🎲 Выбран NFT «{nft_gifts[0]['title']}» для {winner_name} ({user_id})")
 
     try:
         await app.send_message(
@@ -144,9 +127,8 @@ async def send_random_gift(user_id: int, winner_name: str):
             f"Передаю прямо сейчас... 👇"
         )
 
-        nft_list = [g for g in gift_pool if g["is_nft"]]
         sent = False
-        for candidate in nft_list:
+        for candidate in nft_gifts:
             result = await transfer_nft(user_id, candidate["msg_id"], winner_name)
             if result is True:
                 await app.send_message(user_id, f"🎁 NFT «{candidate['title']}» успешно передан!")
@@ -161,7 +143,7 @@ async def send_random_gift(user_id: int, winner_name: str):
                 break
 
         if not sent:
-            log.warning("⚠️ Все NFT недоступны — ничего не отправляем")
+            log.warning("⚠️ Все NFT недоступны")
             try:
                 await app.send_message(user_id, "⚠️ NFT временно недоступен. Свяжитесь с администратором.")
             except Exception:
